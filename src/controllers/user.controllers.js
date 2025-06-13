@@ -6,6 +6,7 @@ import {
   deleteFromCloudinary,
 } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
+import jwt from "jsonwebtoken";
 
 const generateAccessAndRefreshTokens = async (userId) => {
   try {
@@ -153,4 +154,57 @@ const loginUser = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, loggedInUser, "Login successful"));
 });
 
-export { registerUser, loginUser };
+//logout user by clearing cookies
+const logoutUser = asyncHandler(async (req, res) => {
+  await User.findByIdAndUpdate();
+  // need to come back here after middleware implementation
+});
+
+const refreshAccessToken = asyncHandler(async (req, res) => {
+  const incomingRefreshToken =
+    req.cookies.refreshToken || req.body.refreshToken;
+
+  if (!incomingRefreshToken) {
+    throw new ApiError(401, "Refresh token is required");
+  }
+
+  // Verify the refresh token
+  try {
+    const decodedToken = jwt.verify(
+      incomingRefreshToken,
+      process.env.REFRESH_TOKEN_SECRET
+    );
+    const user = await User.findById(decodedToken?._id);
+    if (!user) {
+      throw new ApiError(401, "Invalid refresh token");
+    }
+
+    if (incomingRefreshToken !== user?.refreshToken) {
+      throw new ApiError(401, "Invalid refresh token");
+    }
+
+    // Generate new access and refresh tokens
+    const options = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production", // Use secure cookies in production
+      sameSite: "strict", // Prevent CSRF attacks
+    };
+    const { accessToken, refreshToken, newRefreshToken } =
+      await generateAccessAndRefreshTokens(user._id);
+    return res
+      .status(200)
+      .cookie("accessToken", accessToken, options)
+      .cookie("refreshToken", newRefreshToken, options)
+      .json(
+        new ApiResponse(
+          200,
+          { accessToken, refreshToken },
+          "Tokens refreshed successfully"
+        )
+      );
+  } catch (error) {
+    throw new ApiError(500, "Something went wrong when refreshing your token");
+  }
+});
+
+export { registerUser, loginUser, refreshAccessToken };
