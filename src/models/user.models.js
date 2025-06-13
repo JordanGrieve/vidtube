@@ -1,4 +1,3 @@
-import req from "express/lib/request";
 import mongoose, { Schema } from "mongoose";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
