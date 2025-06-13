@@ -156,8 +156,25 @@ const loginUser = asyncHandler(async (req, res) => {
 
 //logout user by clearing cookies
 const logoutUser = asyncHandler(async (req, res) => {
-  await User.findByIdAndUpdate();
-  // need to come back here after middleware implementation
+  await User.findByIdAndUpdate(
+    req.user._id,
+    {
+      $set: {
+        refreshToken: undefined,
+      },
+    },
+    { new: true } // Return the updated document
+  );
+  const options = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production", // Use secure cookies in production
+    sameSite: "strict", // Prevent CSRF attacks
+  };
+  return res
+    .status(200)
+    .cookie("accessToken", "", { ...options, expires: new Date(0) })
+    .cookie("refreshToken", "", { ...options, expires: new Date(0) })
+    .json(new ApiResponse(200, null, "Logout successful"));
 });
 
 const refreshAccessToken = asyncHandler(async (req, res) => {
@@ -207,4 +224,4 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
   }
 });
 
-export { registerUser, loginUser, refreshAccessToken };
+export { registerUser, loginUser, refreshAccessToken, logoutUser };
